@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, Filter, PhoneCall, Building2, Activity, 
-  UserCheck, LogOut, Phone
+  Clock, User, CheckCircle2, LogOut, Phone
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -12,9 +12,12 @@ export default function Sidebar() {
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/screening-queue', label: 'Lead Screening Queue', icon: Filter, badge: 'New' },
-    { path: '/my-calls', label: 'Daily Calls & Tracking', icon: PhoneCall },
+    { path: '/reminders', label: 'Reminders & Callbacks', icon: Clock },
+    { path: '/assigned-leads', label: 'Handed Over Leads', icon: CheckCircle2 },
+    { path: '/my-calls', label: 'Daily Calls Tracking', icon: PhoneCall },
     { path: '/branch-distribution', label: 'Branch & Map Engine', icon: Building2 },
     { path: '/performance-analytics', label: 'Tracking & Analytics', icon: Activity },
+    { path: '/profile', label: 'My Profile & Incentives', icon: User },
   ];
 
   return (
@@ -37,7 +40,7 @@ export default function Sidebar() {
             {user?.name ? user.name.charAt(0).toUpperCase() : 'T'}
           </div>
           <div className="overflow-hidden">
-            <p className="text-xs font-bold text-slate-200 truncate">{user?.name || 'Telecaller Executive'}</p>
+            <p className="text-xs font-bold text-slate-200 truncate">{user?.name || 'Lucknow Telecaller'}</p>
             <p className="text-[10px] text-slate-400 truncate">{user?.email || 'telecaller@crm.com'}</p>
           </div>
         </div>
@@ -51,7 +54,7 @@ export default function Sidebar() {
                 key={item.path}
                 to={item.path}
                 className={({ isActive }) =>
-                  `flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition ${
+                  `flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition ${
                     isActive
                       ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
                       : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'

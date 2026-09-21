@@ -7,9 +7,12 @@ import Login from './pages/Login';
 import DashboardLayout from './components/DashboardLayout';
 import Dashboard from './pages/Dashboard';
 import LeadScreeningQueue from './pages/LeadScreeningQueue';
+import FollowUpReminders from './pages/FollowUpReminders';
+import AssignedBranchLeads from './pages/AssignedBranchLeads';
 import DailyCallsTracking from './pages/DailyCallsTracking';
 import BranchDistribution from './pages/BranchDistribution';
 import PerformanceAnalytics from './pages/PerformanceAnalytics';
+import TelecallerProfile from './pages/TelecallerProfile';
 
 function ProtectedRoute({ children }) {
   const { isLoggedIn, loading } = useAuth();
@@ -41,9 +44,12 @@ export default function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="screening-queue" element={<LeadScreeningQueue />} />
+            <Route path="reminders" element={<FollowUpReminders />} />
+            <Route path="assigned-leads" element={<AssignedBranchLeads />} />
             <Route path="my-calls" element={<DailyCallsTracking />} />
             <Route path="branch-distribution" element={<BranchDistribution />} />
             <Route path="performance-analytics" element={<PerformanceAnalytics />} />
+            <Route path="profile" element={<TelecallerProfile />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
