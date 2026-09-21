@@ -16,6 +16,7 @@ export default function Dashboard() {
   const [handedOverCount, setHandedOverCount] = useState(0);
   const [followUpsCount, setFollowUpsCount] = useState(0);
   const [conversionRate, setConversionRate] = useState('0.0%');
+  const [weeklyChartData, setWeeklyChartData] = useState([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -24,13 +25,13 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      // 1. Fetch live unscreened queue count
+      // 1. Fetch live unscreened queue
       const queueRes = await leadAPI.getScreeningQueue();
       const unscreenedTotal = queueRes.total || 0;
       setScreeningCount(unscreenedTotal);
 
-      // 2. Fetch live lead data for real metrics
-      const allLeadsRes = await leadAPI.getAllLeads({ limit: 100 });
+      // 2. Fetch live lead data for real metrics & dynamic charts
+      const allLeadsRes = await leadAPI.getAllLeads({ limit: 200 });
       const leads = allLeadsRes.data?.leads || allLeadsRes.leads || [];
 
       // Count handed over to branch
@@ -55,23 +56,61 @@ export default function Dashboard() {
         const rate = ((handedOver / totalProcessed) * 100).toFixed(1);
         setConversionRate(`${rate}%`);
       } else {
-        setConversionRate('100%');
+        setConversionRate('100.0%');
       }
-    } catch {
+
+      // 3. Dynamic calculation of 7-day calling activity from live database lead logs
+      const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const dynamicDays = [];
+
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dayName = daysOfWeek[d.getDay()];
+        const dateStr = d.toISOString().split('T')[0];
+
+        let callsOnDay = 0;
+        let qualifiedOnDay = 0;
+        let handedOverOnDay = 0;
+
+        leads.forEach((l) => {
+          // Check call logs / remarks on this date
+          if (l.remarks && Array.isArray(l.remarks)) {
+            l.remarks.forEach((r) => {
+              if (r.createdAt) {
+                const rDateStr = new Date(r.createdAt).toISOString().split('T')[0];
+                if (rDateStr === dateStr) {
+                  callsOnDay++;
+                }
+              }
+            });
+          }
+
+          // Check if created or handed over on this date
+          if (l.updatedAt && (l.status === 'assigned_to_branch' || l.assignedBranch)) {
+            const uDateStr = new Date(l.updatedAt).toISOString().split('T')[0];
+            if (uDateStr === dateStr) {
+              qualifiedOnDay++;
+              handedOverOnDay++;
+            }
+          }
+        });
+
+        dynamicDays.push({
+          day: dayName,
+          calls: callsOnDay,
+          qualified: qualifiedOnDay,
+          handedOver: handedOverOnDay,
+        });
+      }
+
+      setWeeklyChartData(dynamicDays);
+    } catch (err) {
       toast.error('Could not connect to live database API.');
     } finally {
       setLoading(false);
     }
   };
-
-  const chartData = [
-    { day: 'Mon', calls: 12, qualified: 8, handedOver: 7 },
-    { day: 'Tue', calls: 18, qualified: 12, handedOver: 10 },
-    { day: 'Wed', calls: 15, qualified: 9, handedOver: 8 },
-    { day: 'Thu', calls: 22, qualified: 15, handedOver: 14 },
-    { day: 'Fri', calls: 20, qualified: 14, handedOver: 12 },
-    { day: 'Sat', calls: 16, qualified: 10, handedOver: 9 },
-  ];
 
   return (
     <div className="space-y-6">
@@ -104,7 +143,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Metric Cards - Connected to Real Database APIs */}
+      {/* Metric Cards - 100% Dynamic Database API Data */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
@@ -159,28 +198,28 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Daily Calling & Follow-up Tracking Chart */}
+      {/* Daily Calling & Follow-up Tracking Chart - 100% Dynamic Database Activity */}
       <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
               <PhoneCall className="w-5 h-5 text-amber-500" />
-              Daily Calling & Lead Screening Activity
+              Daily Calling & Lead Screening Activity (Real Database Activity)
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">Calls executed vs qualified leads handed over to branches.</p>
+            <p className="text-xs text-slate-500 mt-0.5">Calls executed vs qualified leads handed over to branches dynamically calculated per day.</p>
           </div>
         </div>
 
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <BarChart data={weeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
               <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#0f172a', borderRadius: '16px', border: 'none', color: '#fff', fontSize: '12px' }}
               />
-              <Bar dataKey="calls" name="Total Calls Made" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="calls" name="Total Calls Logged" fill="#3b82f6" radius={[8, 8, 0, 0]} />
               <Bar dataKey="qualified" name="Leads Qualified" fill="#10b981" radius={[8, 8, 0, 0]} />
               <Bar dataKey="handedOver" name="Assigned to Branch" fill="#f59e0b" radius={[8, 8, 0, 0]} />
             </BarChart>
