@@ -17,7 +17,7 @@ export default function Sidebar() {
     { path: '/my-calls', label: 'Daily Calls Tracking', icon: PhoneCall },
     { path: '/branch-distribution', label: 'Branch & Map Engine', icon: Building2 },
     { path: '/performance-analytics', label: 'Tracking & Analytics', icon: Activity },
-    { path: '/profile', label: 'My Profile & Incentives', icon: User },
+    { path: '/profile', label: 'My Profile', icon: User },
   ];
 
   return (
