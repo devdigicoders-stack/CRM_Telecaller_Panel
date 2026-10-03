@@ -15,8 +15,6 @@ import PerformanceAnalytics from './pages/PerformanceAnalytics';
 import TelecallerProfile from './pages/TelecallerProfile';
 import Notifications from './pages/Notifications';
 import AddLead from './pages/AddLead';
-import MyLeads from './pages/MyLeads';
-import CalendarView from './pages/CalendarView';
 
 function ProtectedRoute({ children }) {
   const { isLoggedIn, loading } = useAuth();
@@ -56,8 +54,6 @@ export default function App() {
             <Route path="profile" element={<TelecallerProfile />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="add-lead" element={<AddLead />} />
-            <Route path="my-leads" element={<MyLeads />} />
-            <Route path="calendar" element={<CalendarView />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

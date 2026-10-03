@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, Filter, PhoneCall, Building2, Activity, 
-  Clock, User, CheckCircle2, LogOut, Phone, Bell, UserPlus,
-  CalendarDays, List
+  Clock, User, CheckCircle2, LogOut, Phone, Bell, UserPlus
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../api/axiosInstance';
@@ -30,9 +29,7 @@ export default function Sidebar() {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/screening-queue', label: 'Lead Screening Queue', icon: Filter, badge: 'New' },
     { path: '/add-lead', label: 'Add New Lead', icon: UserPlus },
-    { path: '/my-leads', label: 'My Leads', icon: List },
     { path: '/reminders', label: 'Reminders & Callbacks', icon: Clock },
-    { path: '/calendar', label: 'Follow-up Calendar', icon: CalendarDays },
     { path: '/assigned-leads', label: 'Handed Over Leads', icon: CheckCircle2 },
     { path: '/my-calls', label: 'Daily Calls Tracking', icon: PhoneCall },
     { path: '/branch-distribution', label: 'Branch & Map Engine', icon: Building2 },
