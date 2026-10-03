@@ -32,7 +32,12 @@ export default function MyLeads() {
   const fetchMyLeads = async () => {
     try {
       setLoading(true);
-      setLeads([]);
+      const res = await leadAPI.getAllLeads({
+        search: search || undefined,
+        status: statusFilter || undefined,
+        limit: 100,
+      });
+      setLeads(res.data?.leads || res.leads || []);
     } catch {
       toast.error('Failed to load your leads.');
     } finally {
