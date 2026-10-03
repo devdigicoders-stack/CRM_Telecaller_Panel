@@ -1,22 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, Filter, PhoneCall, Building2, Activity, 
-  Clock, User, CheckCircle2, LogOut, Phone
+  Clock, User, CheckCircle2, LogOut, Phone, Bell, UserPlus,
+  CalendarDays, List
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import axiosInstance from '../api/axiosInstance';
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const res = await axiosInstance.get('/notifications');
+      const notifs = res.data?.data?.notifications || res.data?.notifications || [];
+      setUnreadCount(notifs.filter(n => !n.read).length);
+    } catch { /* silent */ }
+  };
 
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/screening-queue', label: 'Lead Screening Queue', icon: Filter, badge: 'New' },
+    { path: '/add-lead', label: 'Add New Lead', icon: UserPlus },
+    { path: '/my-leads', label: 'My Leads', icon: List },
     { path: '/reminders', label: 'Reminders & Callbacks', icon: Clock },
+    { path: '/calendar', label: 'Follow-up Calendar', icon: CalendarDays },
     { path: '/assigned-leads', label: 'Handed Over Leads', icon: CheckCircle2 },
     { path: '/my-calls', label: 'Daily Calls Tracking', icon: PhoneCall },
     { path: '/branch-distribution', label: 'Branch & Map Engine', icon: Building2 },
     { path: '/performance-analytics', label: 'Tracking & Analytics', icon: Activity },
+    { path: '/notifications', label: 'Notifications', icon: Bell, notifCount: unreadCount },
     { path: '/profile', label: 'My Profile', icon: User },
   ];
 
@@ -68,6 +89,11 @@ export default function Sidebar() {
                 {item.badge && (
                   <span className="px-2 py-0.5 text-[10px] font-extrabold bg-amber-400 text-slate-950 rounded-full">
                     {item.badge}
+                  </span>
+                )}
+                {item.notifCount > 0 && (
+                  <span className="px-2 py-0.5 text-[10px] font-extrabold bg-rose-500 text-white rounded-full">
+                    {item.notifCount}
                   </span>
                 )}
               </NavLink>

@@ -29,4 +29,12 @@ export const leadAPI = {
     const response = await axiosInstance.get('/dashboard/stats');
     return response.data;
   },
+  createLead: async (data) => {
+    const response = await axiosInstance.post('/leads', data);
+    return response.data;
+  },
+  checkPhone: async (phone) => {
+    const response = await axiosInstance.get('/leads/check-phone', { params: { phone } });
+    return response.data;
+  },
 };
