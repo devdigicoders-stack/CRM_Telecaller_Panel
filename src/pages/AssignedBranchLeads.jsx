@@ -74,51 +74,85 @@ export default function AssignedBranchLeads() {
             <table className="w-full text-left text-xs text-slate-600">
               <thead className="bg-slate-50 text-slate-700 font-extrabold border-b border-slate-200">
                 <tr>
-                  <th className="py-3.5 px-4">Lead Name & Phone</th>
-                  <th className="py-3.5 px-4">Location Verified</th>
+                  <th className="py-3.5 px-4">Lead Name & Contact</th>
+                  <th className="py-3.5 px-4">Location</th>
                   <th className="py-3.5 px-4">Origin Telecaller</th>
-                  <th className="py-3.5 px-4">Target Branch</th>
+                  <th className="py-3.5 px-4">Assigned Branch & Staff</th>
+                  <th className="py-3.5 px-4">Handover Remarks</th>
                   <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4">Lock Status</th>
+                  <th className="py-3.5 px-4">Lock</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {leads.map((l) => (
-                  <tr key={l._id} className="hover:bg-slate-50">
-                    <td className="py-3.5 px-4 font-bold text-slate-900">
-                      <div>{l.name || 'Unnamed Lead'}</div>
-                      <div className="text-slate-500 text-xs">{l.phone}</div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="flex items-center gap-1 font-bold text-emerald-700">
-                        <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                        {l.city || 'Verified'} {l.pinCode ? `(${l.pinCode})` : ''}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-slate-700">
-                      {l.originTelecaller?.name || 'Lucknow Telecaller'}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-emerald-600">
-                      {l.assignedBranch?.name || 'Local Branch'}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2.5 py-1 text-[11px] font-bold bg-emerald-100 text-emerald-800 rounded-xl">
-                        {l.status}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {l.isLocked ? (
-                        <span className="px-2 py-0.5 text-[10px] font-extrabold bg-slate-900 text-amber-400 rounded-full">
-                          🔒 Locked (Max 1 Edit)
+                {leads.map((l) => {
+                  const cleanedPhone = (l.phone || '').replace(/\D/g, '');
+                  const waPhone = cleanedPhone.length === 10 ? `91${cleanedPhone}` : cleanedPhone;
+                  const latestRemark = l.remarks?.length > 0 ? l.remarks[l.remarks.length - 1].note : 'No remarks';
+
+                  return (
+                    <tr key={l._id} className="hover:bg-slate-50 transition">
+                      <td className="py-3.5 px-4 font-bold text-slate-900">
+                        <div className="font-extrabold text-slate-900">{l.name || 'Unnamed Lead'}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-slate-500 font-semibold">{l.phone}</span>
+                          {l.phone && (
+                            <>
+                              <a href={`tel:${l.phone}`} className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg">
+                                📞
+                              </a>
+                              <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg">
+                                💬
+                              </a>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="flex items-center gap-1 font-bold text-emerald-700">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          {l.city || 'Verified'} {l.state ? `, ${l.state}` : ''} {l.pinCode ? `(${l.pinCode})` : ''}
                         </span>
-                      ) : (
-                        <span className="px-2 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded-full">
-                          Unlocked
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-slate-700">
+                        {l.originTelecaller?.name || 'Lucknow Telecaller'}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-emerald-600">
+                        <div>{l.assignedBranch?.name || 'Local Branch'}</div>
+                        {l.branchOwner?.name && (
+                          <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                            Rep: {l.branchOwner.name}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 max-w-xs text-slate-700">
+                        <div className="truncate text-xs font-medium" title={latestRemark}>
+                          {latestRemark}
+                        </div>
+                        {l.addressVerifiedAt && (
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            {new Date(l.addressVerifiedAt).toLocaleDateString('en-IN')}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 text-[11px] font-bold bg-emerald-100 text-emerald-800 rounded-xl whitespace-nowrap">
+                          {l.status}
                         </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {l.isLocked ? (
+                          <span className="px-2 py-0.5 text-[10px] font-extrabold bg-slate-900 text-amber-400 rounded-full">
+                            🔒 Locked
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded-full">
+                            Unlocked
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
