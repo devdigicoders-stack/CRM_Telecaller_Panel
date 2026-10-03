@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PhoneCall, MessageCircle, Search, RefreshCw, AlertCircle, Clock, Plus, FileText } from 'lucide-react';
+import { PhoneCall, MessageCircle, Search, RefreshCw, AlertCircle, Clock, FileText } from 'lucide-react';
 import { leadAPI } from '../api/lead';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -32,14 +32,7 @@ export default function MyLeads() {
   const fetchMyLeads = async () => {
     try {
       setLoading(true);
-      const params = { limit: 200 };
-      if (search) params.search = search;
-      if (statusFilter) params.status = statusFilter;
-      const res = await leadAPI.getAllLeads(params);
-      const all = res.data?.leads || res.leads || [];
-      // Filter only leads assigned to current user
-      const mine = all.filter(l => l.assignedTo?._id === user?._id || l.assignedTo === user?._id);
-      setLeads(mine);
+      setLeads([]);
     } catch {
       toast.error('Failed to load your leads.');
     } finally {
