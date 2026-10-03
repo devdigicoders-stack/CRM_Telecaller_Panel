@@ -17,13 +17,7 @@ export default function BranchDistribution() {
       const res = await branchAPI.getBranches();
       setBranches(res.data?.branches || res.branches || []);
     } catch (err) {
-      // Fallback display if backend branch API is empty
-      setBranches([
-        { _id: '1', name: 'Lucknow Central Hub', city: 'Lucknow', state: 'UP', pincodes: ['226001', '226002', '226010'], active: true },
-        { _id: '2', name: 'Bihar Regional Branch', city: 'Patna', state: 'Bihar', pincodes: ['800001', '800002', '800020'], active: true },
-        { _id: '3', name: 'MP Central Branch', city: 'Bhopal', state: 'MP', pincodes: ['462001', '462002'], active: true },
-        { _id: '4', name: 'Kolkata East Branch', city: 'Kolkata', state: 'West Bengal', pincodes: ['700001', '700002'], active: true },
-      ]);
+      toast.error('Failed to load branch directory.');
     } finally {
       setLoading(false);
     }
