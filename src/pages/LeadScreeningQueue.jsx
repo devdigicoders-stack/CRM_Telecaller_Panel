@@ -31,6 +31,7 @@ export default function LeadScreeningQueue() {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [selectedBranchUserId, setSelectedBranchUserId] = useState('');
+  const [branchSalesPersons, setBranchSalesPersons] = useState([]);
   const [submittingHandover, setSubmittingHandover] = useState(false);
 
   useEffect(() => {
@@ -95,10 +96,11 @@ export default function LeadScreeningQueue() {
       const suggs = res.suggestions || [];
       setBranchSuggestions(suggs);
       if (suggs.length > 0) {
-        setSelectedBranchId(suggs[0].branch._id);
-        if (suggs[0].branch.branchManager?._id) {
-          setSelectedBranchUserId(suggs[0].branch.branchManager._id);
-        }
+        const firstBranch = suggs[0].branch;
+        setSelectedBranchId(firstBranch._id);
+        const persons = firstBranch.assignedUsers || [];
+        setBranchSalesPersons(persons);
+        setSelectedBranchUserId(persons.length > 0 ? persons[0]._id : '');
       }
     } catch (err) {
       toast.error('Failed to fetch nearest branch suggestions.');
@@ -398,7 +400,12 @@ export default function LeadScreeningQueue() {
                     {branchSuggestions.map((sugg) => (
                       <div
                         key={sugg.branch._id}
-                        onClick={() => setSelectedBranchId(sugg.branch._id)}
+                        onClick={() => {
+                          setSelectedBranchId(sugg.branch._id);
+                          const persons = sugg.branch.assignedUsers || [];
+                          setBranchSalesPersons(persons);
+                          setSelectedBranchUserId(persons.length > 0 ? persons[0]._id : '');
+                        }}
                         className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
                           selectedBranchId === sugg.branch._id
                             ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500'
@@ -428,6 +435,27 @@ export default function LeadScreeningQueue() {
                   </div>
                 ) : (
                   <div className="p-4 text-center text-xs text-slate-500">No active branch suggested.</div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Assign to Sales Person</label>
+                {branchSalesPersons.length > 0 ? (
+                  <select
+                    value={selectedBranchUserId}
+                    onChange={(e) => setSelectedBranchUserId(e.target.value)}
+                    className="w-full border border-slate-300 rounded-2xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {branchSalesPersons.map((sp) => (
+                      <option key={sp._id} value={sp._id}>
+                        {sp.name} {sp.role ? `(${sp.role})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="p-3 text-xs text-amber-700 bg-amber-50 rounded-2xl border border-amber-200 font-semibold">
+                    ⚠️ No sales persons assigned to this branch yet.
+                  </div>
                 )}
               </div>
 
