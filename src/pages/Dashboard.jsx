@@ -151,7 +151,7 @@ export default function Dashboard() {
             <h2 className="text-3xl font-black text-amber-600 mt-1">
               {loading ? '...' : screeningCount}
             </h2>
-            <span className="text-[11px] font-bold text-emerald-600 mt-1 inline-block">Real Database Leads</span>
+            <span className="text-[11px] font-bold text-emerald-600 mt-1 inline-block">Assigned to You</span>
           </div>
           <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center">
             <Filter className="w-6 h-6" />
