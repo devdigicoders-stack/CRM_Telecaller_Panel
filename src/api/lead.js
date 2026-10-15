@@ -37,4 +37,12 @@ export const leadAPI = {
     const response = await axiosInstance.get('/leads/check-phone', { params: { phone } });
     return response.data;
   },
+  addLeadRemark: async (id, data) => {
+    const response = await axiosInstance.post(`/leads/${id}/remarks`, data);
+    return response.data;
+  },
+  getTelecallerPerformance: async (params = {}) => {
+    const response = await axiosInstance.get('/dashboard/telecaller-performance', { params });
+    return response.data;
+  },
 };

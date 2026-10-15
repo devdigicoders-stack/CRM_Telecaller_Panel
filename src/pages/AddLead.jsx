@@ -78,9 +78,54 @@ export default function AddLead() {
             {checkingPhone && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">Checking...</span>}
           </div>
           {phoneExists && (
-            <div className="mt-2 p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs font-bold text-rose-700 flex items-center gap-2">
-              <X className="w-4 h-4" />
-              Duplicate! Lead already exists: <span className="underline">{phoneExists.name || phoneExists.phone}</span> — Status: {phoneExists.status}
+            <div className="mt-3 p-4 bg-rose-50/90 border-2 border-rose-200 rounded-2xl text-xs space-y-2.5 animate-fade-in shadow-sm">
+              <div className="flex items-center gap-2 text-rose-800 font-extrabold text-sm">
+                <div className="w-6 h-6 rounded-lg bg-rose-200 text-rose-800 flex items-center justify-center shrink-0">
+                  <X className="w-4 h-4" />
+                </div>
+                <span>Duplicate Lead Alert — Already in CRM!</span>
+              </div>
+              <p className="text-slate-600 font-medium">
+                This phone number already exists for customer <strong className="text-slate-900">{phoneExists.name || 'Unnamed Lead'}</strong> ({phoneExists.phone}).
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-rose-200 text-[11px]">
+                <div>
+                  <span className="text-slate-400 font-semibold uppercase">Currently Assigned To:</span>
+                  <p className="font-bold text-rose-700 text-xs">
+                    {phoneExists.assignedEmployeeName || 'Unassigned'} 
+                    {phoneExists.assignedEmployeeRole && (
+                      <span className="ml-1 px-1.5 py-0.5 rounded bg-rose-200/60 text-[10px] text-rose-800 uppercase font-bold">
+                        {phoneExists.assignedEmployeeRole}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-semibold uppercase">Current Status:</span>
+                  <p className="font-bold text-slate-800 text-xs uppercase">{phoneExists.status || 'N/A'}</p>
+                </div>
+                {phoneExists.assignedBranch && (
+                  <div>
+                    <span className="text-slate-400 font-semibold uppercase">Branch:</span>
+                    <p className="font-bold text-slate-800 text-xs">{phoneExists.assignedBranch}</p>
+                  </div>
+                )}
+                {phoneExists.city && (
+                  <div>
+                    <span className="text-slate-400 font-semibold uppercase">Location:</span>
+                    <p className="font-bold text-slate-800 text-xs">{[phoneExists.city, phoneExists.state].filter(Boolean).join(', ')}</p>
+                  </div>
+                )}
+              </div>
+              {phoneExists.latestRemarkNote && (
+                <div className="pt-1 border-t border-rose-200 text-[11px]">
+                  <span className="text-slate-400 font-semibold uppercase">Latest Remark:</span>
+                  <p className="italic text-slate-700 bg-white/60 p-2 rounded-xl mt-0.5">{phoneExists.latestRemarkNote}</p>
+                </div>
+              )}
+              <div className="text-[11px] text-rose-700 font-bold bg-rose-100/70 px-2.5 py-1.5 rounded-xl">
+                ⚠️ Submission is disabled to prevent duplicate calling and preserve lead assignment integrity.
+              </div>
             </div>
           )}
         </div>

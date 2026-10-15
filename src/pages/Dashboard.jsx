@@ -1,134 +1,127 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Filter, PhoneCall, Building2, Clock, TrendingUp, RefreshCw 
+  Filter, PhoneCall, Building2, Clock, TrendingUp, RefreshCw, 
+  Calendar, CheckCircle2, PhoneForwarded, Users, AlertCircle, ArrowUpRight
 } from 'lucide-react';
 import { leadAPI } from '../api/lead';
 import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid 
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend 
 } from 'recharts';
 import { toast } from 'sonner';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [screeningCount, setScreeningCount] = useState(0);
-  const [handedOverCount, setHandedOverCount] = useState(0);
-  const [followUpsCount, setFollowUpsCount] = useState(0);
-  const [conversionRate, setConversionRate] = useState('0.0%');
-  const [weeklyChartData, setWeeklyChartData] = useState([]);
+  
+  // Timeframe Filter State
+  const [timeframe, setTimeframe] = useState('today');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [telecallerName, setTelecallerName] = useState('');
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  // Performance Metrics
+  const [metrics, setMetrics] = useState({
+    totalLeadsReceived: 0,
+    totalCallsCompleted: 0,
+    totalPendingCalls: 0,
+    totalCallbacks: 0,
+    totalHandedOverToSales: 0,
+    remainingFollowups: 0
+  });
 
-  const fetchDashboardData = async () => {
+  const [weeklyActivity, setWeeklyActivity] = useState([]);
+
+  // Format local YYYY-MM-DD
+  const formatYMD = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleTimeframeChange = (newTf) => {
+    setTimeframe(newTf);
+    const today = new Date();
+
+    if (newTf === 'today') {
+      const ymd = formatYMD(today);
+      setStartDate(ymd);
+      setEndDate(ymd);
+    } else if (newTf === 'yesterday') {
+      const yest = new Date();
+      yest.setDate(yest.getDate() - 1);
+      const ymd = formatYMD(yest);
+      setStartDate(ymd);
+      setEndDate(ymd);
+    } else if (newTf === 'thisWeek') {
+      const d = new Date();
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff));
+      setStartDate(formatYMD(monday));
+      setEndDate(formatYMD(new Date()));
+    } else if (newTf === 'thisMonth') {
+      const d = new Date();
+      const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
+      setStartDate(formatYMD(firstDay));
+      setEndDate(formatYMD(new Date()));
+    }
+  };
+
+  const fetchPerformanceData = async () => {
     try {
       setLoading(true);
-      // 1. Fetch live unscreened queue
-      const queueRes = await leadAPI.getScreeningQueue();
-      const unscreenedTotal = queueRes.total || 0;
-      setScreeningCount(unscreenedTotal);
-
-      // 2. Fetch live lead data for real metrics & dynamic charts
-      const allLeadsRes = await leadAPI.getAllLeads({ limit: 200 });
-      const leads = allLeadsRes.data?.leads || allLeadsRes.leads || [];
-
-      // Count handed over to branch
-      const handedOver = leads.filter(
-        (l) => l.status === 'assigned_to_branch' || l.assignedBranch || l.originTelecaller
-      ).length;
-      setHandedOverCount(handedOver);
-
-      // Count today's follow-ups
-      const now = new Date();
-      const todayStr = now.toISOString().split('T')[0];
-      const followUps = leads.filter((l) => {
-        if (!l.followUpDate) return false;
-        const fDateStr = new Date(l.followUpDate).toISOString().split('T')[0];
-        return fDateStr === todayStr;
-      }).length;
-      setFollowUpsCount(followUps);
-
-      // Calculate efficiency
-      const totalProcessed = unscreenedTotal + handedOver;
-      if (totalProcessed > 0) {
-        const rate = ((handedOver / totalProcessed) * 100).toFixed(1);
-        setConversionRate(`${rate}%`);
-      } else {
-        setConversionRate('100.0%');
+      const params = { timeframe };
+      if (timeframe === 'custom') {
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
       }
 
-      // 3. Dynamic calculation of 7-day calling activity from live database lead logs
-      const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const dynamicDays = [];
-
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dayName = daysOfWeek[d.getDay()];
-        const dateStr = d.toISOString().split('T')[0];
-
-        let callsOnDay = 0;
-        let qualifiedOnDay = 0;
-        let handedOverOnDay = 0;
-
-        leads.forEach((l) => {
-          // Check call logs / remarks on this date
-          if (l.remarks && Array.isArray(l.remarks)) {
-            l.remarks.forEach((r) => {
-              if (r.createdAt) {
-                const rDateStr = new Date(r.createdAt).toISOString().split('T')[0];
-                if (rDateStr === dateStr) {
-                  callsOnDay++;
-                }
-              }
-            });
-          }
-
-          // Check if created or handed over on this date
-          if (l.updatedAt && (l.status === 'assigned_to_branch' || l.assignedBranch)) {
-            const uDateStr = new Date(l.updatedAt).toISOString().split('T')[0];
-            if (uDateStr === dateStr) {
-              qualifiedOnDay++;
-              handedOverOnDay++;
-            }
-          }
-        });
-
-        dynamicDays.push({
-          day: dayName,
-          calls: callsOnDay,
-          qualified: qualifiedOnDay,
-          handedOver: handedOverOnDay,
-        });
+      const res = await leadAPI.getTelecallerPerformance(params);
+      if (res?.data) {
+        setMetrics(res.data.metrics || {});
+        setWeeklyActivity(res.data.weeklyActivity || []);
+        if (res.telecaller?.name) {
+          setTelecallerName(res.telecaller.name);
+        }
       }
-
-      setWeeklyChartData(dynamicDays);
     } catch (err) {
-      toast.error('Could not connect to live database API.');
+      console.error('Failed to load performance metrics:', err);
+      toast.error('Could not load telecaller performance metrics.');
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchPerformanceData();
+    // eslint-disable-next-line
+  }, [timeframe, startDate, endDate]);
+
+  const callRate = metrics.totalLeadsReceived > 0 
+    ? Math.round((metrics.totalCallsCompleted / metrics.totalLeadsReceived) * 100)
+    : 0;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* ══════════ HEADER ══════════ */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 p-6 rounded-3xl text-white shadow-xl border border-slate-800">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full text-xs font-bold mb-2">
             Central Lead Qualification Console
           </div>
-          <h1 className="text-2xl font-black tracking-tight">Lucknow Telecaller Dashboard</h1>
+          <h1 className="text-2xl font-black tracking-tight">
+            {telecallerName ? `${telecallerName}'s Performance Dashboard` : 'Telecaller Performance Dashboard'}
+          </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Filter raw leads, log calls, verify customer PIN/city, and assign qualified leads to local branches.
+            Real-time daily calling analytics, pending calls backlog, and branch handover tracking.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
-            onClick={fetchDashboardData}
-            className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl transition"
+            onClick={fetchPerformanceData}
+            className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl transition border border-slate-700"
             title="Refresh Live Data"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -138,90 +131,243 @@ export default function Dashboard() {
             className="px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition"
           >
             <Filter className="w-4 h-4" />
-            Open Lead Screening Queue ({screeningCount})
+            Screening Queue ({metrics.totalPendingCalls})
           </button>
         </div>
       </div>
 
-      {/* Metric Cards - 100% Dynamic Database API Data */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Unscreened Queue</p>
-            <h2 className="text-3xl font-black text-amber-600 mt-1">
-              {loading ? '...' : screeningCount}
-            </h2>
-            <span className="text-[11px] font-bold text-emerald-600 mt-1 inline-block">Assigned to You</span>
+      {/* ══════════ TIMEFRAME SELECTOR ══════════ */}
+      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400 mr-1.5">
+            Date Filter:
+          </span>
+          {[
+            { id: 'today', label: 'Today' },
+            { id: 'yesterday', label: 'Yesterday' },
+            { id: 'thisWeek', label: 'This Week' },
+            { id: 'thisMonth', label: 'This Month' },
+            { id: 'custom', label: 'Custom Range' },
+          ].map((tf) => (
+            <button
+              key={tf.id}
+              onClick={() => handleTimeframeChange(tf.id)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                timeframe === tf.id
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              {tf.label}
+            </button>
+          ))}
+        </div>
+
+        {timeframe === 'custom' && (
+          <div className="flex items-center gap-2 flex-wrap animate-fade-in">
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              />
+            </div>
+            <span className="text-xs font-bold text-slate-400">to</span>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              />
+            </div>
+            <button
+              onClick={fetchPerformanceData}
+              className="px-3.5 py-1.5 bg-amber-500 text-slate-950 font-bold text-xs rounded-xl hover:bg-amber-400 transition"
+            >
+              Apply
+            </button>
           </div>
-          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center">
-            <Filter className="w-6 h-6" />
+        )}
+      </div>
+
+      {/* ══════════ METRICS GRID (6 Synchronized KPI Cards) ══════════ */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+        {/* 1. Leads Assigned / Received */}
+        <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-slate-300 transition">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Assigned Leads
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Users className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <h2 className="text-2xl font-black text-slate-900">
+              {loading ? '...' : metrics.totalLeadsReceived}
+            </h2>
+            <span className="text-[10px] font-bold text-blue-600">From Preeti / System</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Handed Over to Branch</p>
-            <h2 className="text-3xl font-black text-emerald-600 mt-1">
-              {loading ? '...' : handedOverCount}
-            </h2>
-            <span className="text-[11px] font-bold text-emerald-600 mt-1 inline-block">Location Verified</span>
+        {/* 2. Calls Completed */}
+        <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-slate-300 transition">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Calls Made
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
           </div>
-          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
-            <Building2 className="w-6 h-6" />
+          <div className="mt-3">
+            <h2 className="text-2xl font-black text-emerald-600">
+              {loading ? '...' : metrics.totalCallsCompleted}
+            </h2>
+            <span className="text-[10px] font-bold text-emerald-600">Calls Done</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Call Follow-ups</p>
-            <h2 className="text-3xl font-black text-blue-600 mt-1">
-              {loading ? '...' : followUpsCount}
-            </h2>
-            <span className="text-[11px] font-bold text-blue-600 mt-1 inline-block">Scheduled Callbacks</span>
+        {/* 3. Pending Calls */}
+        <div 
+          onClick={() => navigate('/screening-queue')}
+          className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-amber-400 cursor-pointer transition group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Pending Calls
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Clock className="w-4 h-4" />
+            </div>
           </div>
-          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
-            <Clock className="w-6 h-6" />
+          <div className="mt-3">
+            <h2 className="text-2xl font-black text-amber-600">
+              {loading ? '...' : metrics.totalPendingCalls}
+            </h2>
+            <span className="text-[10px] font-bold text-amber-600 flex items-center gap-1">
+              Need Calling <ArrowUpRight className="w-3 h-3" />
+            </span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Qualification Efficiency</p>
-            <h2 className="text-3xl font-black text-slate-900 mt-1">
-              {loading ? '...' : conversionRate}
-            </h2>
-            <span className="text-[11px] font-bold text-emerald-600 mt-1 inline-block">Handover Conversion</span>
+        {/* 4. Handed Over to Sales */}
+        <div 
+          onClick={() => navigate('/branch-distribution')}
+          className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-purple-400 cursor-pointer transition group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Sales Handover
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Building2 className="w-4 h-4" />
+            </div>
           </div>
-          <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center">
-            <TrendingUp className="w-6 h-6" />
+          <div className="mt-3">
+            <h2 className="text-2xl font-black text-purple-600">
+              {loading ? '...' : metrics.totalHandedOverToSales}
+            </h2>
+            <span className="text-[10px] font-bold text-purple-600">Qualified Leads</span>
+          </div>
+        </div>
+
+        {/* 5. Callbacks Scheduled */}
+        <div 
+          onClick={() => navigate('/reminders')}
+          className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-blue-400 cursor-pointer transition group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Callbacks
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <PhoneForwarded className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <h2 className="text-2xl font-black text-cyan-600">
+              {loading ? '...' : metrics.totalCallbacks}
+            </h2>
+            <span className="text-[10px] font-bold text-cyan-600">Requested Call</span>
+          </div>
+        </div>
+
+        {/* 6. Remaining Follow-ups */}
+        <div 
+          onClick={() => navigate('/reminders')}
+          className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-rose-400 cursor-pointer transition group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Follow-ups Due
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <AlertCircle className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <h2 className="text-2xl font-black text-rose-600">
+              {loading ? '...' : metrics.remainingFollowups}
+            </h2>
+            <span className="text-[10px] font-bold text-rose-600">Action Required</span>
           </div>
         </div>
       </div>
 
-      {/* Daily Calling & Follow-up Tracking Chart - 100% Dynamic Database Activity */}
+      {/* ══════════ CALLING COMPLETION PROGRESS BAR ══════════ */}
+      <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+              Calling Target Completion Rate:
+            </span>
+          </div>
+          <span className="text-sm font-black text-slate-900">{callRate}%</span>
+        </div>
+        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+          <div
+            className="h-3 rounded-full transition-all duration-700 bg-gradient-to-r from-blue-500 to-emerald-500"
+            style={{ width: `${Math.min(callRate, 100)}%` }}
+          />
+        </div>
+        <div className="flex justify-between items-center text-[11px] text-slate-400 font-semibold mt-2">
+          <span>{metrics.totalCallsCompleted} called</span>
+          <span>{metrics.totalPendingCalls} remaining to call</span>
+        </div>
+      </div>
+
+      {/* ══════════ DYNAMIC 7-DAY CALLING & SCREENING ACTIVITY CHART ══════════ */}
       <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
               <PhoneCall className="w-5 h-5 text-amber-500" />
-              Daily Calling & Lead Screening Activity (Real Database Activity)
+              Daily Calling & Lead Screening Activity (Live Database Aggregation)
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">Calls executed vs qualified leads handed over to branches dynamically calculated per day.</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Calls made vs leads assigned vs sales handovers tracked dynamically across the last 7 days.
+            </p>
           </div>
         </div>
 
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={weeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <BarChart data={weeklyActivity} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
               <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#0f172a', borderRadius: '16px', border: 'none', color: '#fff', fontSize: '12px' }}
               />
-              <Bar dataKey="calls" name="Total Calls Logged" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="qualified" name="Leads Qualified" fill="#10b981" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="handedOver" name="Assigned to Branch" fill="#f59e0b" radius={[8, 8, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+              <Bar dataKey="calls" name="Calls Completed" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="received" name="Leads Received" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="handedOver" name="Handover to Sales" fill="#10b981" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
