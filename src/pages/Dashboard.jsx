@@ -80,10 +80,12 @@ export default function Dashboard() {
 
       const res = await leadAPI.getTelecallerPerformance(params);
       if (res?.data) {
-        setMetrics(res.data.metrics || {});
-        setWeeklyActivity(res.data.weeklyActivity || []);
-        if (res.telecaller?.name) {
-          setTelecallerName(res.telecaller.name);
+        const payload = res.data.metrics || res.data || {};
+        setMetrics(payload);
+        setWeeklyActivity(res.data.weeklyActivity || res.data.dailyActivity || res.weeklyActivity || []);
+        const tName = res.telecaller?.name || res.data?.telecaller?.name || '';
+        if (tName) {
+          setTelecallerName(tName);
         }
       }
     } catch (err) {
@@ -131,7 +133,7 @@ export default function Dashboard() {
             className="px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition"
           >
             <Filter className="w-4 h-4" />
-            Screening Queue ({metrics.totalPendingCalls})
+            Screening Queue ({metrics.totalPendingCalls || 0})
           </button>
         </div>
       </div>
@@ -207,9 +209,11 @@ export default function Dashboard() {
           </div>
           <div className="mt-3">
             <h2 className="text-2xl font-black text-slate-900">
-              {loading ? '...' : metrics.totalLeadsReceived}
+              {loading ? '...' : (metrics.totalLeadsReceived ?? 0)}
             </h2>
-            <span className="text-[10px] font-bold text-blue-600">From Preeti / System</span>
+            <span className="text-[10px] font-bold text-blue-600 block mt-0.5">
+              CRM/Admin: {metrics.totalAssignedByCrmOrAdmin ?? metrics.allTimeAssignedByCrmOrAdmin ?? 0}
+            </span>
           </div>
         </div>
 
@@ -225,13 +229,15 @@ export default function Dashboard() {
           </div>
           <div className="mt-3">
             <h2 className="text-2xl font-black text-emerald-600">
-              {loading ? '...' : metrics.totalCallsCompleted}
+              {loading ? '...' : (metrics.totalCallsCompleted ?? 0)}
             </h2>
-            <span className="text-[10px] font-bold text-emerald-600">Calls Done</span>
+            <span className="text-[10px] font-bold text-emerald-600 block mt-0.5">
+              Total Calls: {metrics.allTimeCallsCompleted ?? metrics.totalCallsCompleted ?? 0}
+            </span>
           </div>
         </div>
 
-        {/* 3. Pending Calls */}
+        {/* 3. Pending Calls (Present & Past Backlog) */}
         <div 
           onClick={() => navigate('/screening-queue')}
           className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-amber-400 cursor-pointer transition group"
@@ -246,17 +252,18 @@ export default function Dashboard() {
           </div>
           <div className="mt-3">
             <h2 className="text-2xl font-black text-amber-600">
-              {loading ? '...' : metrics.totalPendingCalls}
+              {loading ? '...' : (metrics.totalPendingCalls ?? 0)}
             </h2>
-            <span className="text-[10px] font-bold text-amber-600 flex items-center gap-1">
-              Need Calling <ArrowUpRight className="w-3 h-3" />
+            <span className="text-[10px] font-bold text-amber-600 flex items-center justify-between mt-0.5">
+              <span>Past: {metrics.pendingCallsPast ?? 0}</span>
+              <span>Today: {metrics.pendingCallsToday ?? 0}</span>
             </span>
           </div>
         </div>
 
         {/* 4. Handed Over to Sales */}
         <div 
-          onClick={() => navigate('/branch-distribution')}
+          onClick={() => navigate('/assigned-leads')}
           className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-purple-400 cursor-pointer transition group"
         >
           <div className="flex items-center justify-between">
@@ -269,9 +276,11 @@ export default function Dashboard() {
           </div>
           <div className="mt-3">
             <h2 className="text-2xl font-black text-purple-600">
-              {loading ? '...' : metrics.totalHandedOverToSales}
+              {loading ? '...' : (metrics.totalHandedOverToSales ?? 0)}
             </h2>
-            <span className="text-[10px] font-bold text-purple-600">Qualified Leads</span>
+            <span className="text-[10px] font-bold text-purple-600 block mt-0.5">
+              Total: {metrics.allTimeHandedOver ?? metrics.totalHandedOverToSales ?? 0} Handed
+            </span>
           </div>
         </div>
 

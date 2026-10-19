@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Building2, Search, CheckCircle, Navigation, ShieldCheck, MapPin, 
   RefreshCw, Phone, MessageCircle, FileText, User, AlertCircle, 
-  Clock, Check, Filter, ChevronRight
+  Clock, Check, Filter, ChevronRight, Eye, X
 } from 'lucide-react';
 import { leadAPI } from '../api/lead';
 import { branchAPI } from '../api/branch';
@@ -36,6 +36,9 @@ export default function AssignedBranchLeads() {
   const [followUpDate, setFollowUpDate] = useState('');
   const [newStatus, setNewStatus] = useState('');
   const [submittingRemark, setSubmittingRemark] = useState(false);
+
+  // Full Remarks Viewer Modal State
+  const [viewAllRemarksLead, setViewAllRemarksLead] = useState(null);
 
   useEffect(() => {
     fetchAssignedLeads();
@@ -332,21 +335,39 @@ export default function AssignedBranchLeads() {
                           </span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 max-w-xs text-slate-700">
-                        <div className="truncate text-xs font-medium" title={latestRemark}>
-                          {latestRemark}
-                        </div>
-                        {l.remarks?.length > 0 && l.remarks[l.remarks.length - 1].createdAt && (
-                          <div className="text-[10px] text-slate-400 mt-0.5">
-                            {new Date(l.remarks[l.remarks.length - 1].createdAt).toLocaleDateString('en-IN', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
+                      <td className="py-3.5 px-4 max-w-sm text-slate-700">
+                        <div 
+                          onClick={() => setViewAllRemarksLead(l)}
+                          className="cursor-pointer group/rem p-1.5 -m-1.5 rounded-xl hover:bg-slate-100 transition"
+                          title="Click to view full remark history"
+                        >
+                          <div className="text-xs font-semibold text-slate-800 line-clamp-2 group-hover/rem:text-emerald-700">
+                            {latestRemark}
                           </div>
-                        )}
+                          <div className="flex items-center justify-between gap-2 mt-1.5">
+                            {l.remarks?.length > 0 && l.remarks[l.remarks.length - 1].createdAt ? (
+                              <span className="text-[10px] text-slate-400 font-medium">
+                                {new Date(l.remarks[l.remarks.length - 1].createdAt).toLocaleDateString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            ) : <span></span>}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewAllRemarksLead(l);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-extrabold text-[10px] border border-emerald-200 transition"
+                            >
+                              <Eye className="w-3 h-3" />
+                              Pura Remark ({l.remarks?.length || 0})
+                            </button>
+                          </div>
+                        </div>
                       </td>
                       <td className="py-3.5 px-4">
                         <span className={`px-2.5 py-1 text-[11px] font-bold rounded-xl whitespace-nowrap ${
@@ -655,6 +676,126 @@ export default function AssignedBranchLeads() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════ FULL REMARKS VIEWER MODAL (Pura Remark Dekhe) ══════════ */}
+      {viewAllRemarksLead && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            {/* Modal Header */}
+            <div className="p-6 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 text-white flex items-center justify-between">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold mb-1">
+                  Complete Audit Trail
+                </div>
+                <h3 className="text-lg font-black tracking-tight flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-emerald-400" />
+                  {viewAllRemarksLead.name || 'Lead'} — Full Remark History
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Phone: <span className="text-slate-200 font-mono font-bold">{viewAllRemarksLead.phone}</span> • Branch: <span className="text-emerald-400 font-bold">{viewAllRemarksLead.assignedBranch?.name || 'Not Assigned'}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setViewAllRemarksLead(null)}
+                className="p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700 transition"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body: Full Remarks Timeline */}
+            <div className="p-6 overflow-y-auto space-y-4 flex-1 bg-slate-50">
+              {viewAllRemarksLead.remarks && viewAllRemarksLead.remarks.length > 0 ? (
+                <div className="space-y-3">
+                  {[...viewAllRemarksLead.remarks].reverse().map((r, idx) => {
+                    const isHandover = r.note?.includes('[QUALIFIED') || r.note?.includes('HANDED OVER');
+                    const isCalling = r.note?.includes('[TELECALLER');
+
+                    return (
+                      <div
+                        key={r._id || idx}
+                        className={`p-4 rounded-2xl border transition shadow-sm ${
+                          isHandover
+                            ? 'bg-emerald-50/80 border-emerald-300 ring-1 ring-emerald-400/40'
+                            : isCalling
+                            ? 'bg-amber-50/80 border-amber-300'
+                            : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            {isHandover ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white font-extrabold text-[10px] uppercase tracking-wider">
+                                📍 Branch Handover Note
+                              </span>
+                            ) : isCalling ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-extrabold text-[10px] uppercase tracking-wider">
+                                📞 Telecaller Call Log
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-extrabold text-[10px] uppercase tracking-wider">
+                                📝 Remark #{viewAllRemarksLead.remarks.length - idx}
+                              </span>
+                            )}
+                            <span className="text-xs font-bold text-slate-700">
+                              By: {r.addedBy?.name || 'Staff User'}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-semibold text-slate-400">
+                            {r.createdAt ? new Date(r.createdAt).toLocaleString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : 'Date N/A'}
+                          </span>
+                        </div>
+
+                        {/* Full Note Text */}
+                        <p className="text-xs text-slate-800 font-medium whitespace-pre-wrap leading-relaxed select-text">
+                          {r.note}
+                        </p>
+
+                        {r.followUpDate && (
+                          <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center gap-1.5 text-[11px] font-bold text-blue-700">
+                            <Clock className="w-3.5 h-3.5" />
+                            Next Follow-up Scheduled: {new Date(r.followUpDate).toLocaleString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-slate-400 text-xs font-medium">
+                  <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  No remarks recorded for this lead yet.
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-white border-t border-slate-200 flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500">
+                Total Remarks: {viewAllRemarksLead.remarks?.length || 0}
+              </span>
+              <button
+                onClick={() => setViewAllRemarksLead(null)}
+                className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
