@@ -13,6 +13,7 @@ const STATUS_COLORS = {
   not_interested: 'bg-rose-100 text-rose-800',
   converted: 'bg-purple-100 text-purple-800',
   in_process: 'bg-cyan-100 text-cyan-800',
+  teacher_required_later: 'bg-purple-100 text-purple-800 border border-purple-200',
 };
 
 export default function MyLeads() {
@@ -110,6 +111,7 @@ export default function MyLeads() {
           <option value="interested">Interested</option>
           <option value="callback">Callback</option>
           <option value="not_interested">Not Interested</option>
+          <option value="teacher_required_later">Teacher Required Later</option>
           <option value="in_process">In Process</option>
           <option value="converted">Converted</option>
         </select>
@@ -213,6 +215,7 @@ export default function MyLeads() {
                   <option value="interested">Interested</option>
                   <option value="callback">Callback</option>
                   <option value="not_interested">Not Interested</option>
+                  <option value="teacher_required_later">Teacher Required Later</option>
                   <option value="in_process">In Process</option>
                   <option value="converted">Converted</option>
                 </select>

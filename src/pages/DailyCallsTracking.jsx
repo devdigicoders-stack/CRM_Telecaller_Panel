@@ -73,6 +73,7 @@ export default function DailyCallsTracking() {
           <option value="interested">Interested</option>
           <option value="callback">Callback</option>
           <option value="not_interested">Not Interested</option>
+          <option value="teacher_required_later">Teacher Required Later</option>
           <option value="assigned_to_branch">Handed Over to Branch</option>
           <option value="converted">Converted</option>
         </select>

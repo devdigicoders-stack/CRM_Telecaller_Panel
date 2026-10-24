@@ -306,6 +306,7 @@ export default function LeadScreeningQueue() {
                 >
                   <option value="interested">Interested</option>
                   <option value="callback">Callback Requested</option>
+                  <option value="teacher_required_later">Teacher Required Later</option>
                   <option value="not_interested">Not Interested</option>
                   <option value="invalid_number">Invalid Number</option>
                 </select>
