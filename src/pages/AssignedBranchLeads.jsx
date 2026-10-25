@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Building2, Search, CheckCircle, Navigation, ShieldCheck, MapPin, 
   RefreshCw, Phone, MessageCircle, FileText, User, AlertCircle, 
@@ -8,6 +8,7 @@ import { leadAPI } from '../api/lead';
 import { branchAPI } from '../api/branch';
 import { toast } from 'sonner';
 import axiosInstance from '../api/axiosInstance';
+import SearchableSelect from '../components/SearchableSelect';
 
 export default function AssignedBranchLeads() {
   const [leads, setLeads] = useState([]);
@@ -15,6 +16,10 @@ export default function AssignedBranchLeads() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [allBranchesList, setAllBranchesList] = useState([]);
+
+  // Sales Person Filter State
+  const [salesPersonsList, setSalesPersonsList] = useState([]);
+  const [selectedSalesPerson, setSelectedSalesPerson] = useState('');
 
   // Branch Handover Modal State
   const [activeBranchLead, setActiveBranchLead] = useState(null);
@@ -43,6 +48,7 @@ export default function AssignedBranchLeads() {
   useEffect(() => {
     fetchAssignedLeads();
     fetchAllBranches();
+    fetchAllSalesPersons();
   }, [search]);
 
   const fetchAllBranches = async () => {
@@ -51,6 +57,16 @@ export default function AssignedBranchLeads() {
       setAllBranchesList(res.branches || res.data || []);
     } catch {
       // ignore
+    }
+  };
+
+  const fetchAllSalesPersons = async () => {
+    try {
+      const res = await axiosInstance.get('/users/sales-list');
+      const salesUsers = res.data?.data?.users || res.data?.users || [];
+      setSalesPersonsList(salesUsers);
+    } catch (err) {
+      console.error('Failed to fetch sales users list:', err);
     }
   };
 
@@ -67,24 +83,106 @@ export default function AssignedBranchLeads() {
     }
   };
 
+  // Compile unique sales persons list for the searchable filter
+  const salesPersonOptions = useMemo(() => {
+    const map = new Map();
+
+    // 1. From API
+    salesPersonsList.forEach((sp) => {
+      if (sp?._id) {
+        map.set(String(sp._id), {
+          value: String(sp._id),
+          label: sp.name || 'Sales Person',
+          sublabel: [sp.email, sp.phone].filter(Boolean).join(' • '),
+        });
+      }
+    });
+
+    // 2. From Leads (branchOwner or assigned sales)
+    leads.forEach((l) => {
+      const bo = l.branchOwner;
+      if (bo?._id && !map.has(String(bo._id))) {
+        map.set(String(bo._id), {
+          value: String(bo._id),
+          label: bo.name || 'Sales Rep',
+          sublabel: [bo.email, bo.phone].filter(Boolean).join(' • '),
+        });
+      }
+      const at = l.assignedTo;
+      if (at?._id && (at?.role === 'sales' || bo) && !map.has(String(at._id))) {
+        map.set(String(at._id), {
+          value: String(at._id),
+          label: at.name || 'Sales Rep',
+          sublabel: [at.email, at.phone].filter(Boolean).join(' • '),
+        });
+      }
+    });
+
+    // 3. From allBranchesList assignedUsers
+    allBranchesList.forEach((b) => {
+      (b.assignedUsers || []).forEach((u) => {
+        if (u?._id && !map.has(String(u._id))) {
+          map.set(String(u._id), {
+            value: String(u._id),
+            label: u.name || 'Sales Rep',
+            sublabel: [u.email, u.phone].filter(Boolean).join(' • '),
+          });
+        }
+      });
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [salesPersonsList, leads, allBranchesList]);
+
   const handleOpenBranchModal = async (lead) => {
     setActiveBranchLead(lead);
     setPinCode(lead.pinCode || '');
     setCity(lead.city || '');
     setState(lead.state || '');
     setHandoverRemark('');
-    setSelectedBranchId(lead.assignedBranch?._id || lead.assignedBranch || '');
-    setSelectedBranchUserId(lead.branchOwner?._id || lead.branchOwner || '');
-    setManualBranchSelect(false);
-    await fetchBranchSuggestions(lead._id, lead.pinCode || '', lead.city || '', lead.state || '');
+
+    const assignedBId = lead.assignedBranch?._id || lead.assignedBranch || '';
+    const assignedUId = lead.branchOwner?._id || lead.branchOwner || '';
+
+    setSelectedBranchId(assignedBId);
+    setSelectedBranchUserId(assignedUId);
+
+    if (assignedBId) {
+      setManualBranchSelect(true);
+      const matched = allBranchesList.find((b) => b._id === assignedBId);
+      if (matched) {
+        setBranchSalesPersons(matched.assignedUsers || []);
+      }
+    } else {
+      setManualBranchSelect(false);
+    }
+
+    await fetchBranchSuggestions(lead._id, lead.pinCode || '', lead.city || '', lead.state || '', assignedBId, assignedUId);
   };
 
-  const fetchBranchSuggestions = async (leadId, pin, cty, st) => {
+  const fetchBranchSuggestions = async (leadId, pin, cty, st, existingBranchId, existingBranchUserId) => {
     try {
       setLoadingSuggestions(true);
       const res = await leadAPI.suggestBranches(leadId, { pinCode: pin, city: cty, state: st });
       const suggs = res.suggestions || [];
       setBranchSuggestions(suggs);
+
+      // If lead already has an assigned branch, preserve it
+      if (existingBranchId) {
+        let matched = allBranchesList.find((b) => b._id === existingBranchId);
+        if (!matched) {
+          matched = suggs.find((s) => s.branch._id === existingBranchId)?.branch;
+        }
+        if (matched) {
+          const persons = matched.assignedUsers || [];
+          setBranchSalesPersons(persons);
+          if (existingBranchUserId && persons.some((p) => p._id === existingBranchUserId)) {
+            setSelectedBranchUserId(existingBranchUserId);
+          }
+        }
+        return;
+      }
+
       if (suggs.length > 0) {
         const firstBranch = suggs[0].branch;
         setSelectedBranchId(firstBranch._id);
@@ -124,6 +222,7 @@ export default function AssignedBranchLeads() {
       toast.error('Please select a branch to route the lead.');
       return;
     }
+    const isReassign = Boolean(activeBranchLead.assignedBranch);
     try {
       setSubmittingHandover(true);
       await leadAPI.qualifyAndAssignBranch(activeBranchLead._id, {
@@ -134,7 +233,7 @@ export default function AssignedBranchLeads() {
         pinCode,
         handoverRemark,
       });
-      toast.success(`Lead successfully assigned to branch!`);
+      toast.success(isReassign ? 'Lead successfully reassigned to branch & sales rep!' : 'Lead successfully assigned to branch!');
       setActiveBranchLead(null);
       fetchAssignedLeads();
     } catch (err) {
@@ -174,8 +273,18 @@ export default function AssignedBranchLeads() {
     }
   };
 
-  // Filter leads based on selected tab
+  // Filter leads based on selected tab, search text, and sales person
   const filteredLeads = leads.filter((l) => {
+    // 1. Sales Person Filter
+    if (selectedSalesPerson) {
+      const matchOwner = l.branchOwner && String(l.branchOwner._id || l.branchOwner) === String(selectedSalesPerson);
+      const matchAssigned = l.assignedTo && String(l.assignedTo._id || l.assignedTo) === String(selectedSalesPerson);
+      if (!matchOwner && !matchAssigned) {
+        return false;
+      }
+    }
+
+    // 2. Status Filter
     if (statusFilter === 'assigned') {
       return l.status === 'assigned_to_branch' || l.assignedBranch;
     }
@@ -203,30 +312,45 @@ export default function AssignedBranchLeads() {
         </div>
         <button
           onClick={fetchAssignedLeads}
-          className="p-2.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-2xl text-xs flex items-center gap-2 hover:bg-slate-100 shadow-sm transition"
+          className="p-2.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-2xl text-xs flex items-center gap-2 hover:bg-slate-100 shadow-sm transition cursor-pointer"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh List
         </button>
       </div>
 
-      {/* Filter Tabs & Search Bar */}
+      {/* Filter Tabs, Search Bar & Sales Person Filter */}
       <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-3">
-        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
-          <div className="relative flex-1 w-full">
-            <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by customer name, phone, city, branch, remarks..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+          {/* Search bar & Sales person filter in one flexible row */}
+          <div className="flex flex-col sm:flex-row gap-2.5 flex-1 items-stretch">
+            <div className="relative flex-1">
+              <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by customer name, phone, city, branch, remarks..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+              />
+            </div>
+
+            {/* Sales Person Searchable Select Filter */}
+            <SearchableSelect
+              options={salesPersonOptions}
+              value={selectedSalesPerson}
+              onChange={setSelectedSalesPerson}
+              placeholder="Search sales person..."
+              defaultLabel="All Sales Persons"
+              className="w-full sm:w-64"
             />
           </div>
-          <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+
+          {/* Status Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 shrink-0">
             <button
               onClick={() => setStatusFilter('all')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
                 statusFilter === 'all'
                   ? 'bg-slate-900 text-white shadow-sm'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -236,7 +360,7 @@ export default function AssignedBranchLeads() {
             </button>
             <button
               onClick={() => setStatusFilter('assigned')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
                 statusFilter === 'assigned'
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
@@ -246,7 +370,7 @@ export default function AssignedBranchLeads() {
             </button>
             <button
               onClick={() => setStatusFilter('pending')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
                 statusFilter === 'pending'
                   ? 'bg-amber-500 text-white shadow-sm'
                   : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
@@ -256,6 +380,28 @@ export default function AssignedBranchLeads() {
             </button>
           </div>
         </div>
+
+        {/* Active Filter Indicator Badge */}
+        {selectedSalesPerson && (
+          <div className="flex items-center gap-2 pt-1 text-xs text-slate-600 font-medium animate-in fade-in">
+            <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Filter:</span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 font-bold text-xs border border-emerald-200 shadow-xs">
+              <User className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{salesPersonOptions.find(o => o.value === selectedSalesPerson)?.label || 'Sales Person'}</span>
+              <button
+                type="button"
+                onClick={() => setSelectedSalesPerson('')}
+                className="hover:bg-emerald-200 p-0.5 rounded-full transition ml-0.5 cursor-pointer"
+                title="Clear filter"
+              >
+                <X className="w-3 h-3 text-emerald-700" />
+              </button>
+            </span>
+            <span className="text-slate-400 text-xs font-semibold">
+              ({filteredLeads.length} leads matching)
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -281,7 +427,7 @@ export default function AssignedBranchLeads() {
                   <th className="py-3.5 px-4">Assigned Branch & Staff</th>
                   <th className="py-3.5 px-4">Handover Remarks</th>
                   <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4">Lock</th>
+                  <th className="py-3.5 px-4 text-center">Reassignment</th>
                   <th className="py-3.5 px-4 text-center">Actions</th>
                 </tr>
               </thead>
@@ -380,16 +526,10 @@ export default function AssignedBranchLeads() {
                           {l.status}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {l.isLocked ? (
-                          <span className="px-2 py-0.5 text-[10px] font-extrabold bg-slate-900 text-amber-400 rounded-full">
-                            🔒 Locked
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded-full">
-                            Unlocked
-                          </span>
-                        )}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-center">
+                        <span className="px-2.5 py-1 text-[10px] font-extrabold bg-emerald-50 text-emerald-800 rounded-full border border-emerald-200 inline-flex items-center gap-1">
+                          <RefreshCw className="w-2.5 h-2.5" /> Reassignable
+                        </span>
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
@@ -434,12 +574,31 @@ export default function AssignedBranchLeads() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
                 <Navigation className="w-5 h-5 text-emerald-600" />
-                Assign Lead to Branch
+                {activeBranchLead.assignedBranch ? 'Reassign Lead to Branch & Sales Rep' : 'Assign Lead to Branch'}
               </h2>
               <span className="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-xl border border-emerald-200">
                 {activeBranchLead.name || activeBranchLead.phone}
               </span>
             </div>
+
+            {/* Currently Assigned Banner */}
+            {activeBranchLead.assignedBranch && (
+              <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-xs">
+                <div>
+                  <span className="font-extrabold text-slate-700">Currently Assigned:</span>
+                  <span className="ml-2 font-bold text-emerald-700">
+                    {activeBranchLead.assignedBranch?.name || 'Assigned Branch'}
+                  </span>
+                  <span className="mx-2 text-slate-400">•</span>
+                  <span className="font-bold text-indigo-700">
+                    Rep: {activeBranchLead.branchOwner?.name || 'General Pool'}
+                  </span>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Ready to Reassign
+                </span>
+              </div>
+            )}
 
             <form onSubmit={handleConfirmHandover} className="mt-4 space-y-4">
               {/* Location Inputs with Search */}
@@ -605,7 +764,7 @@ export default function AssignedBranchLeads() {
                   className="px-5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-md transition disabled:opacity-50 flex items-center gap-1.5"
                 >
                   <Check className="w-4 h-4" />
-                  {submittingHandover ? 'Assigning...' : 'Confirm Assignment'}
+                  {submittingHandover ? 'Processing...' : (activeBranchLead.assignedBranch ? 'Confirm Reassignment' : 'Confirm Assignment')}
                 </button>
               </div>
             </form>
