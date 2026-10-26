@@ -54,19 +54,21 @@ export default function AssignedBranchLeads() {
   const fetchAllBranches = async () => {
     try {
       const res = await branchAPI.getBranches();
-      setAllBranchesList(res.branches || res.data || []);
+      const list = res?.data?.branches || res?.branches || (Array.isArray(res?.data) ? res.data : []);
+      setAllBranchesList(Array.isArray(list) ? list : []);
     } catch {
-      // ignore
+      setAllBranchesList([]);
     }
   };
 
   const fetchAllSalesPersons = async () => {
     try {
       const res = await axiosInstance.get('/users/sales-list');
-      const salesUsers = res.data?.data?.users || res.data?.users || [];
-      setSalesPersonsList(salesUsers);
+      const salesUsers = res.data?.data?.users || res.data?.users || (Array.isArray(res.data) ? res.data : []);
+      setSalesPersonsList(Array.isArray(salesUsers) ? salesUsers : []);
     } catch (err) {
       console.error('Failed to fetch sales users list:', err);
+      setSalesPersonsList([]);
     }
   };
 
@@ -74,10 +76,11 @@ export default function AssignedBranchLeads() {
     try {
       setLoading(true);
       const res = await leadAPI.getAllLeads({ search, limit: 150 });
-      const allLeads = res.data?.leads || res.leads || [];
-      setLeads(allLeads);
+      const allLeads = res.data?.leads || res.leads || (Array.isArray(res.data) ? res.data : []);
+      setLeads(Array.isArray(allLeads) ? allLeads : []);
     } catch {
       toast.error('Failed to load assigned branch leads.');
+      setLeads([]);
     } finally {
       setLoading(false);
     }
@@ -87,8 +90,12 @@ export default function AssignedBranchLeads() {
   const salesPersonOptions = useMemo(() => {
     const map = new Map();
 
+    const safeSalesList = Array.isArray(salesPersonsList) ? salesPersonsList : [];
+    const safeLeads = Array.isArray(leads) ? leads : [];
+    const safeBranches = Array.isArray(allBranchesList) ? allBranchesList : [];
+
     // 1. From API
-    salesPersonsList.forEach((sp) => {
+    safeSalesList.forEach((sp) => {
       if (sp?._id) {
         map.set(String(sp._id), {
           value: String(sp._id),
@@ -99,7 +106,7 @@ export default function AssignedBranchLeads() {
     });
 
     // 2. From Leads (branchOwner or assigned sales)
-    leads.forEach((l) => {
+    safeLeads.forEach((l) => {
       const bo = l.branchOwner;
       if (bo?._id && !map.has(String(bo._id))) {
         map.set(String(bo._id), {
@@ -119,8 +126,9 @@ export default function AssignedBranchLeads() {
     });
 
     // 3. From allBranchesList assignedUsers
-    allBranchesList.forEach((b) => {
-      (b.assignedUsers || []).forEach((u) => {
+    safeBranches.forEach((b) => {
+      const users = Array.isArray(b?.assignedUsers) ? b.assignedUsers : [];
+      users.forEach((u) => {
         if (u?._id && !map.has(String(u._id))) {
           map.set(String(u._id), {
             value: String(u._id),
